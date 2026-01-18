@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRACE FOR CITIANS - Campus Hero</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .hidden { display: none !important; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); }
+        
+        @keyframes slideUp {
+            0% { transform: translateY(100%); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+        .toast-active { animation: slideUp 3s ease-in-out forwards; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <nav class="glass sticky top-0 z-50 p-4 px-6 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-2">
+            <div class="bg-orange-600 text-white w-10 h-10 flex items-center justify-center rounded-xl font-black italic shadow-lg">TR</div>
+            <h1 class="text-xl font-extrabold tracking-tighter uppercase italic">Trace</h1>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <button onclick="deleteHistory()" class="text-xs font-bold text-red-500 hover:text-red-700 transition uppercase tracking-tighter">
+                Delete History
+            </button>
+            
+            <div class="text-right border-l pl-4 border-slate-200">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Credits</p>
+                <div class="flex items-center gap-2">
+                    <span id="userCredits" class="text-lg font-black text-orange-600">0</span>
+                    <span class="text-orange-400 text-sm">⭐</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div id="emptyState" class="max-w-6xl mx-auto p-20 text-center">
+        <p class="text-5xl mb-4 text-slate-200">🔍</p>
+        <h2 class="text-2xl font-bold text-slate-300 uppercase tracking-tighter">No items reported</h2>
+        <p class="text-slate-400">Report a found item to start earning credits!</p>
+    </div>
+
+    <main id="gallery" class="grid grid-cols-1 md:grid-cols-3 gap-8 p-6 max-w-6xl mx-auto"></main>
+
+    <button id="openReportBtn" class="fixed bottom-8 right-8 bg-orange-600 text-white p-4 px-8 rounded-2xl font-bold shadow-2xl hover:scale-105 transition active:scale-95 z-40 flex items-center gap-2">
+        <span>+</span> Report New Item
+    </button>
+
+    <div id="toast" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 glass p-4 px-8 rounded-2xl shadow-2xl z-[100] border-t-4 border-orange-500 flex items-center gap-4">
+        <span class="text-3xl">🎉</span>
+        <div><p class="font-black text-orange-600 uppercase">Credits Earned!</p></div>
+    </div>
+
+    <div id="infoModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[70] p-4">
+        <div class="bg-white rounded-[2.5rem] max-w-sm w-full p-8 shadow-2xl relative text-center">
+            <button onclick="closeInfoModal()" class="absolute top-6 right-6 text-slate-300 hover:text-slate-900 text-2xl">&times;</button>
+            <div id="modalContent"></div>
+            <button onclick="closeInfoModal()" class="mt-8 w-full bg-slate-100 py-4 rounded-2xl font-bold hover:bg-slate-200 transition">Close</button>
+        </div>
+    </div>
+
+    <div id="reportModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+        <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md relative">
+            <h2 class="text-3xl font-black mb-6 italic tracking-tighter uppercase">Report Item</h2>
+            <form id="itemForm" class="space-y-4">
+                <input type="text" id="itemTitle" placeholder="Item Name" class="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 transition-all" required>
+                <div class="flex gap-3">
+                    <select id="itemType" class="w-1/2 p-4 bg-slate-50 rounded-2xl outline-none font-bold text-orange-600">
+                        <option value="Lost">Lost</option>
+                        <option value="Found">Found</option>
+                    </select>
+                    <input type="text" id="itemLocation" placeholder="Where was it?" class="w-1/2 p-4 bg-slate-50 rounded-2xl outline-none" required>
+                </div>
+                <textarea id="itemDesc" placeholder="Item Description (color, size, marks)..." class="w-full p-4 bg-slate-50 rounded-2xl outline-none" rows="3"></textarea>
+                <div class="flex gap-2 pt-4">
+                    <button type="button" id="closeReportBtn" class="w-1/3 py-4 font-bold text-slate-400">Cancel</button>
+                    <button type="submit" class="w-2/3 bg-orange-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all">Submit Report</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA LOGIC ---
+        // Start with empty data as requested
+        let items = JSON.parse(localStorage.getItem('trace_data')) || [];
+        let credits = parseInt(localStorage.getItem('trace_credits')) || 0;
+
+        // Function: Earn Credits
+        function updateCredits(amount) {
+            credits += amount;
+            localStorage.setItem('trace_credits', credits);
+            document.getElementById('userCredits').innerText = credits;
+            
+            const toast = document.getElementById('toast');
+            toast.classList.remove('hidden');
+            toast.classList.add('toast-active');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('toast-active');
+            }, 3000);
+        }
+
+        // Function: DELETE HISTORY
+        function deleteHistory() {
+            if (confirm("Are you sure you want to delete all reports and reset your credits?")) {
+                localStorage.removeItem('trace_data');
+                localStorage.removeItem('trace_credits');
+                items = [];
+                credits = 0;
+                document.getElementById('userCredits').innerText = 0;
+                renderItems();
+                alert("History Cleared!");
+            }
+        }
+
+        // Function: RENDER GALLERY
+        function renderItems() {
+            const gallery = document.getElementById('gallery');
+            const emptyState = document.getElementById('emptyState');
+            gallery.innerHTML = '';
+            
+            if (items.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                items.forEach((item, index) => {
+                    const isFound = item.type === "Found";
+                    gallery.innerHTML += `
+                        <div class="glass p-6 rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all border-t-8 ${isFound ? 'border-green-500' : 'border-red-500'}">
+                            <span class="text-[10px] font-black uppercase tracking-widest ${isFound ? 'text-green-500' : 'text-red-500'}">${item.type}</span>
+                            <h3 class="text-2xl font-black mt-1 uppercase truncate">${item.title}</h3>
+                            <p class="text-slate-400 text-sm mt-1 truncate">📍 ${item.location}</p>
+                            <button onclick="showInfo(${index})" class="w-full mt-6 py-4 rounded-2xl bg-slate-900 text-white font-bold hover:bg-orange-600 transition shadow-lg shadow-slate-200">View Details</button>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // Function: SHOW INFO MODAL
+        function showInfo(index) {
+            const item = items[index];
+            const earned = item.type === "Found" ? 50 : 0;
+            const modalContent = document.getElementById('modalContent');
+            
+            modalContent.innerHTML = `
+                <div class="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">🔎</div>
+                <h2 class="text-3xl font-black text-slate-900 uppercase">${item.title}</h2>
+                <div class="mt-6 space-y-4 text-left">
+                    <div class="bg-slate-50 p-4 rounded-2xl">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Found At</p>
+                        <p class="text-lg font-bold text-slate-700 italic">📍 ${item.location}</p>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex justify-between items-center">
+                        <div>
+                            <p class="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Reward Received</p>
+                            <p class="text-2xl font-black text-orange-600">+${earned} ⭐</p>
+                        </div>
+                        <span class="text-xs font-bold text-orange-300">CAMPUS HERO</span>
+                    </div>
+                    <div class="px-2">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Item Details</p>
+                        <p class="text-slate-500 italic">"${item.desc}"</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('infoModal').classList.remove('hidden');
+        }
+
+        function closeInfoModal() { document.getElementById('infoModal').classList.add('hidden'); }
+
+        // Form Submission Logic
+        document.getElementById('itemForm').onsubmit = (e) => {
+            e.preventDefault();
+            const type = document.getElementById('itemType').value;
+            const newItem = {
+                title: document.getElementById('itemTitle').value,
+                type: type,
+                location: document.getElementById('itemLocation').value,
+                desc: document.getElementById('itemDesc').value
+            };
+
+            items.unshift(newItem); // Adds new report to the top
+            localStorage.setItem('trace_data', JSON.stringify(items));
+            
+            // Earn credits only for FOUND items
+            if(type === "Found") updateCredits(50);
+            
+            renderItems();
+            document.getElementById('reportModal').classList.add('hidden');
+            e.target.reset();
+        };
+
+        // Modal Controls
+        document.getElementById('openReportBtn').onclick = () => document.getElementById('reportModal').classList.remove('hidden');
+        document.getElementById('closeReportBtn').onclick = () => document.getElementById('reportModal').classList.add('hidden');
+
+        // Initial Load
+        document.getElementById('userCredits').innerText = credits;
+        renderItems();
+    </script>
+</body>
+</html>
